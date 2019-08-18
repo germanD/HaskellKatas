@@ -1,5 +1,4 @@
-
-{- Scott Encoding Katta by A.Partridge -}
+{- Lottery Ticket by A.Partridge -}
 {- https://www.codewars.com/kata/lottery-ticket/train/haskell/ -}
 
 {-
