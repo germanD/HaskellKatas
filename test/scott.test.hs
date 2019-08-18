@@ -1,7 +1,9 @@
 module ScottEncoding.Test where
 
-import Prelude hiding (null, length, map, foldl, foldr, take, fst, 
-                        snd, curry, uncurry, concat, zip, (++), filter)
+import qualified Prelude (zip)	
+import Prelude hiding (null, length, map, foldl, foldr, take, fst,  
+                        snd, curry, uncurry, zip, concat, (++), filter,
+                        nothing, just, snil) 
 import ScottEncoding
 import Test.Hspec
 
@@ -56,7 +58,7 @@ testL =
           runList (fromList []) 0 reduce `shouldBe` 0
           runList (fromList [1,2]) 0 reduce `shouldBe` 21
       it "null xs?" $ do
-          null  nil `shouldBe` True
+          null snil `shouldBe` True
           null (fromList []) `shouldBe` True
           null (fromList [1,2]) `shouldBe` False
       it "cons Tests " $ do
@@ -65,12 +67,12 @@ testL =
 
 testF = 
     describe "Fold/Map Properties for List" $ do
-      it "foldr cons nil = id" $ do
-        (toList $ foldr cons nil $ fromList [1..5]) `shouldBe` [1..5]
-      it "foldl (flip cons) nil = rev" $ do
-        (toList $ foldl (flip cons) nil $ fromList [1..5]) `shouldBe` (reverse [1..5])
-      it "foldl rcons nil = id" $ do
-        (toList $ foldl rcons nil $ fromList [1..5]) `shouldBe` [1..5]
+      it "foldr cons snil = id" $ do
+        (toList $ foldr cons snil $ fromList [1..5]) `shouldBe` [1..5]
+      it "foldl (flip cons) snil = rev" $ do
+        (toList $ foldl (flip cons) snil $ fromList [1..5]) `shouldBe` (reverse [1..5])
+      it "foldl rcons snil = id" $ do
+        (toList $ foldl rcons snil $ fromList [1..5]) `shouldBe` [1..5]
       it "Map Functor: map id = id" $ do
         (toList $ map id $ fromList [1..5]) `shouldBe` [1..5]
       it "Map Functor: map assoc" $ do
@@ -84,7 +86,7 @@ testD =
 testS = 
      describe "List Surgery" $ do
       it "take Basics" $ do
-          (toList $ take 8 nil) `shouldBe` ([] :: [Int])
+          (toList $ take 8 snil) `shouldBe` ([] :: [Int])
           (toList $ take 0 $ fromList [1..5]) `shouldBe` []
           (toList $ take 5 $ fromList [1..8]) `shouldBe` [1..5]
       it "take lenght = id" $ do
@@ -96,13 +98,29 @@ testS =
             in (toList $ concat ls rs) `shouldBe` [1..10]           
       it "catMaybe . map Just = id" $ do
            let ms = fromList [1..5]
-           (toList $ catMaybes $ map just ms) `shouldBe` [1..5]
+           (toList $ catMaybes $ map sjust ms) `shouldBe` [1..5]
       it "catMaybe Surgery" $ do
-           let ls = map just $ fromList [1..5]
-               rs = map just $ fromList [6..10]
-               xs = concat ls (cons nothing rs)
-            in (toList $ catMaybes xs) `shouldBe` [1..10]
-      
+           let ls = map sjust $ fromList [1..5]
+               rs = map sjust $ fromList [6..10]
+               xs = concat ls (cons snothing rs)
+           in (toList $ catMaybes xs) `shouldBe` [1..10]
+            
+testZ = 
+       describe "List Zipping" $ do
+         it "zip snils is snil" $ do
+           (toList $ map toPair $ zip (snil :: SList Int) (snil :: SList Int)) `shouldBe` ([] :: [(Int,Int)]) 
+         it "zip snil with sth is snil" $ do
+             let rs = fromList [ 1 .. 8]
+             (toList $ map toPair $ zip (snil :: SList Int) rs) `shouldBe` ([] :: [(Int,Int)]) 
+         it "zip sth with snil is snil" $ do
+             let ls = fromList [ 1 .. 8]
+             (toList $ map toPair $ zip ls (snil :: SList Int)) `shouldBe` ([] :: [(Int,Int)]) 
+         it "zip does some zipping" $ do
+           let as = [1..4] :: [Int]
+               bs = [5..8] :: [Int]
+               ls = fromList as
+               rs = fromList bs
+           in (toList $ map toPair $ zip ls rs) `shouldBe` [(1,5),(2,6),(3,7),(4,8)]
 main = 
   do hspec testP
      hspec testMB
@@ -111,4 +129,5 @@ main =
      hspec testF
      hspec testD
      hspec testS
+     hspec testZ
  

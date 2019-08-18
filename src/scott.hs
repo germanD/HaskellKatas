@@ -58,13 +58,12 @@ take, a function to limit a list to a number of initial elements
 
 -}
 
-
 {-# LANGUAGE ScopedTypeVariables, Rank2Types #-}
 
 module ScottEncoding where
 
 import Prelude hiding (null, length, map, foldl, foldr, take,
-  fst, snd, curry, uncurry, concat, zip, (++))
+  fst, snd, curry, uncurry, concat, zip, (++), tail)
 
 newtype SPair a b = SPair { runPair :: forall c. (a -> b -> c) -> c }
 
@@ -89,7 +88,7 @@ snd  = uncurry (\ x y -> y)
 -- curry transforms SPair algebras into (,) algebras
 
 curry :: (SPair a b -> c) -> (a -> b -> c)
-curry f x y = f (fromPair (x,y))
+curry f x y = f $ fromPair (x,y)
 
 pmap :: (a -> c) -> (b -> d) -> SPair a b -> SPair c d
 pmap  f g = uncurry $ \ a b -> fromPair (f a, g b)
@@ -97,6 +96,8 @@ pmap  f g = uncurry $ \ a b -> fromPair (f a, g b)
 swap :: SPair a b -> SPair b a
 swap  = uncurry $ \ a b -> fromPair (b, a)
 
+pair :: a -> b -> SPair a b
+pair a b = fromPair (a,b)
 
 newtype SMaybe a = SMaybe { runMaybe :: forall b. b -> (a -> b) -> b }
 
@@ -106,15 +107,15 @@ caseM e f m = runMaybe m e f
 toMaybe :: SMaybe a -> Maybe a
 toMaybe =  caseM Nothing Just
 
-nothing :: SMaybe a
-nothing = SMaybe $ const
+snothing :: SMaybe a
+snothing = SMaybe $ const
 
-just  :: a -> SMaybe a
-just  = \ x -> SMaybe $ \ _ f -> f x
+sjust  :: a -> SMaybe a
+sjust  = \ x -> SMaybe $ \ _ f -> f x
 
 fromMaybe :: Maybe a -> SMaybe a
-fromMaybe Nothing = nothing
-fromMaybe (Just n) = just n
+fromMaybe Nothing = snothing
+fromMaybe (Just n) = sjust n
 
 isJust :: SMaybe a -> Bool
 isJust =  caseM False (const True)
@@ -153,11 +154,14 @@ fromList (x:xs) = SList $ \ _ f -> f x $ fromList xs
 cons :: a -> SList a -> SList a
 cons x ls = SList $ \ _ f -> f x ls
 
-nil :: SList a
-nil = SList $ \ e _ -> e
+snil :: SList a
+snil = SList $ \ e _ -> e
 
 null :: SList a -> Bool
 null xs = runList xs True $ \ _ _ -> False
+
+caseL :: c -> (a -> SList a -> c) -> SList a -> c
+caseL e g xs = runList xs e g 
 
 foldr :: (a -> b -> b) -> b -> SList a -> b
 foldr f e l = runList l e $ \ x m -> f x $ foldr f e m
@@ -166,8 +170,13 @@ foldl :: (b -> a -> b) -> b -> SList a -> b
 foldl f e l = runList l e $ \ x  -> foldl f $ f e x
 
 map :: (a -> b) -> SList a -> SList b
-map f = foldr ( \ x ms -> cons (f x) ms) nil
+map f = foldr ( \ x ms -> cons (f x) ms) snil
 
+fhead :: SList a -> a
+fhead = caseL undefined (\ x xs -> x)
+
+tail :: SList a -> SList a
+tail = caseL snil (\ x xs -> xs)
 
 -- List Surgery
 
@@ -178,33 +187,33 @@ concat :: SList a -> SList a -> SList a
 concat = foldr (\ x g -> (cons x) . g) id
 
 rcons :: SList a -> a -> SList a
-rcons xs = concat xs . (flip cons $ nil)  
+rcons xs = concat xs . (flip cons $ snil)  
 
 take :: Int -> SList a -> SList a
-take n xs = foldr falg (const nil) xs n
+take n xs = foldr falg (const snil) xs n
  where falg x rs n 
-         | n <= 0    = nil
+         | n <= 0    = snil
          | otherwise = cons x $ rs $ n -1 
 
 -- TODO: Scott encoding for Nats 
 
 catMaybes :: SList (SMaybe a) -> SList a
-catMaybes = foldr falg nil
- where falg x ls = concat (caseM nil (flip cons $ nil) x) ls
-
---- zip"
+catMaybes = foldr falg snil
+ where falg x ls = concat (caseM snil (flip cons $ snil) x) ls
 
 zip :: SList a -> SList b -> SList (SPair a b)
-zip = error "zip"
+zip aa bb
+  | null aa || null bb = snil
+  | otherwise  =
+      let (a,as) = (fhead aa, tail aa)
+          (b,bs) = (fhead bb, tail bb)
+      in  cons (pair a b) $ zip as bs
+
 
 partition :: SList (SEither a b) -> SPair (SList a) (SList b)
-partition = foldr falg $ fromPair (nil :: SList a, nil :: SList b)
+partition = foldr falg $ fromPair (snil :: SList a, snil :: SList b)
   where falg ab ms = let ls = fst ms
                          rs = snd ms
                      in caseE (\ x -> fromPair (cons x ls,rs))
                               (\ x -> fromPair (ls, cons x rs)) ab
-
-
-
-
 
