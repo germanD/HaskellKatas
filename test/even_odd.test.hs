@@ -23,6 +23,11 @@ main = hspec $ do
       fromEven (S.oddPlusOdd nine one) `shouldBe` 10
     it "oddPlusEven works" $ do
       fromOdd (S.oddPlusEven one two) `shouldBe` 3
+  describe "Auxiliary Plus Lemmass" $ do
+    it "zeroPlusOdd works"$ do
+      fromOdd (S.zeroPlusOdd three) `shouldBe` 3    
+    it "onePlusEven works"$ do
+      fromOdd (S.onePlusEven six) `shouldBe` 7    
   describe "(*)Times(*)" $ do
     it "evenTimesEven works" $ do
       fromEven (S.evenTimesEven four six) `shouldBe` 24

@@ -59,7 +59,7 @@ typecheck. The rest is easy, as long as you don't use undefined.)
 
 -}
 
-{-# LANGUAGE GADTs, DataKinds, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies, UndecidableInstances, AllowAmbiguousTypes #-}
 
 module OddsAndEvens where
 
@@ -85,45 +85,68 @@ data Odd (a :: Nat) :: * where
 -- Notice how I use the axioms here.
 evenPlusOne :: Even n -> Odd (S n)
 evenPlusOne ZeroEven = OneOdd
-evenPlusOne (NextEven n) = NextOdd (evenPlusOne n)
+evenPlusOne (NextEven n) = NextOdd $ evenPlusOne n
 
 -- | Proves that if n is odd, n+1 is even.
 oddPlusOne :: Odd n -> Even (S n)
-oddPlusOne = error "TODO: oddPlusOne"
+oddPlusOne OneOdd = NextEven ZeroEven
+oddPlusOne (NextOdd n) = NextEven $ oddPlusOne n
 
 -- | Adds two natural numbers together.
 -- Notice how the definition pattern matches.
 type family   Add (n :: Nat) (m :: Nat) :: Nat
-type instance Add Z m = m
+type instance Add Z     m = m
 type instance Add (S n) m = S (Add n m)
 
 -- | Proves even + even = even
 -- Notice how the pattern matching mirrors `Add`s definition.
 evenPlusEven :: Even n -> Even m -> Even (Add n m)
-evenPlusEven ZeroEven m = m
-evenPlusEven (NextEven n) m = NextEven (evenPlusEven n m)
+evenPlusEven ZeroEven     = id
+evenPlusEven (NextEven n) = NextEven . evenPlusEven n
 
 -- | Proves odd + odd = even
 oddPlusOdd :: Odd n -> Odd m -> Even (Add n m)
-oddPlusOdd = error "TODO: oddPlusOdd"
+oddPlusOdd OneOdd      = oddPlusOne 
+oddPlusOdd (NextOdd n) = NextEven . oddPlusOdd n
+
+-- some add0n, addSn lemmas to avoid pattern-nmatching later
+
+zeroPlusOdd :: Odd n -> Odd (Add Z n)
+zeroPlusOdd OneOdd      = OneOdd
+zeroPlusOdd (NextOdd n) = NextOdd $ zeroPlusOdd n
+
+onePlusEven :: Even n -> Odd (Add (S Z) n)
+onePlusEven ZeroEven     = OneOdd
+onePlusEven (NextEven n) = NextOdd $ onePlusEven n
+
+-- notice these are just a traversal with the constructors: in regular
+-- (not-type-level) programming they would be just the identity, here
+-- we have an effect in which we compute the proof: the pattern above
+-- is a base constructor switch in the base inductive case and a
+-- constructor applied to the IH.
+
+-- However, now we change the base case to use the lemma above, but we
+-- keep the constructor after IH nature of the inductive case.
 
 -- | Proves even + odd = odd
 evenPlusOdd :: Even n -> Odd m -> Odd (Add n m)
-evenPlusOdd = error "TODO: evenPlusOdd"
+evenPlusOdd ZeroEven     = zeroPlusOdd
+evenPlusOdd (NextEven n) = NextOdd . evenPlusOdd n
 
 -- | Proves odd + even = odd
 oddPlusEven :: Odd n -> Even m -> Odd (Add n m)
-oddPlusEven = error "TODO: oddPlusEven"
+oddPlusEven OneOdd      = onePlusEven
+oddPlusEven (NextOdd n) = NextOdd . oddPlusEven n
 
 -- | Multiplies two natural numbers.
 type family   Mult (n :: Nat) (m :: Nat) :: Nat
 type instance Mult Z m = Z
 
 -- I'd wish to be able to write here
+
 -- type instance Mult (S Z) m = m
 
--- as well, but type instances do not allow casing/if: they have to be
--- deterministic? 
+-- as well, but type instances do not allow casing/if.
 
 type instance Mult (S n) m = Add m (Mult n m)
 
@@ -142,3 +165,25 @@ evenTimesOdd = error "TODO: evenTimesOdd"
 -- | Proves odd * even = even
 oddTimesEven :: Odd n -> Even m -> Even (Mult n m)
 oddTimesEven = error "TODO: oddTimesEven"
+
+
+-- Representations to Integers
+fromEven :: Even n -> Int
+fromEven ZeroEven = 0
+fromEven (NextEven n) = 2 + fromEven n
+fromOdd :: Odd n -> Int
+fromOdd OneOdd = 1
+fromOdd (NextOdd n) = 2 + fromOdd n
+
+-- Numbers for help during tests
+zero = ZeroEven
+one = OneOdd
+two = NextEven zero
+three = NextOdd one
+four = NextEven two
+five = NextOdd three
+six = NextEven four
+seven = NextOdd five
+eight = NextEven six
+nine = NextOdd seven
+ten = NextEven eight
