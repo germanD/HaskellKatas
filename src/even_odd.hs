@@ -59,7 +59,8 @@ typecheck. The rest is easy, as long as you don't use undefined.)
 
 -}
 
-{-# LANGUAGE GADTs, DataKinds, TypeFamilies, UndecidableInstances, AllowAmbiguousTypes #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies, UndecidableInstances,
+  AllowAmbiguousTypes, ScopedTypeVariables #-}
 
 module OddsAndEvens where
 
@@ -119,11 +120,11 @@ onePlusEven :: Even n -> Odd (Add (S Z) n)
 onePlusEven ZeroEven     = OneOdd
 onePlusEven (NextEven n) = NextOdd $ onePlusEven n
 
--- notice these are just a traversal with the constructors: in regular
--- (not-type-level) programming they would be just the identity, here
--- we have an effect in which we compute the proof: the pattern above
--- is a base constructor switch in the base inductive case and a
--- constructor applied to the IH.
+-- GAD: notice these are just a traversal with the constructors: in
+-- regular (not-type-level) programming they would be just the
+-- identity, here we have an effect in which we compute the proof: the
+-- pattern above is a base constructor switch in the base inductive
+-- case and a constructor applied to the IH.
 
 -- However, now we change the base case to use the lemma above, but we
 -- keep the constructor after IH nature of the inductive case.
@@ -150,9 +151,14 @@ type instance Mult Z m = Z
 
 type instance Mult (S n) m = Add m (Mult n m)
 
+forcing :: Even (Add n m) -> Even (Add (S (S n)) m)
+forcing m = NextEven m 
+
 -- | Proves even * even = even
 evenTimesEven :: Even n -> Even m -> Even (Mult n m)
-evenTimesEven = error "TODO: evenTimesEven"
+evenTimesEven ZeroEven     m = ZeroEven
+evenTimesEven (NextEven n) m = addTwiceEven m $ evenTimesEven n m
+ where addTwiceEven m n = evenPlusEven m $ evenPlusEven m n
 
 -- | Proves odd * odd = odd
 oddTimesOdd :: Odd n -> Odd m -> Odd (Mult n m)
