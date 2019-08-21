@@ -59,8 +59,7 @@ typecheck. The rest is easy, as long as you don't use undefined.)
 
 -}
 
-{-# LANGUAGE GADTs, DataKinds, TypeFamilies, UndecidableInstances,
-  AllowAmbiguousTypes, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies, UndecidableInstances #-}
 
 module OddsAndEvens where
 
@@ -110,7 +109,7 @@ oddPlusOdd :: Odd n -> Odd m -> Even (Add n m)
 oddPlusOdd OneOdd      = oddPlusOne 
 oddPlusOdd (NextOdd n) = NextEven . oddPlusOdd n
 
--- some add0n, addSn lemmas to avoid pattern-nmatching later
+-- GAD: some add0n, addSn lemmas to avoid pattern-nmatching later
 
 zeroPlusOdd :: Odd n -> Odd (Add Z n)
 zeroPlusOdd OneOdd      = OneOdd
@@ -134,44 +133,83 @@ evenPlusOdd :: Even n -> Odd m -> Odd (Add n m)
 evenPlusOdd ZeroEven     = zeroPlusOdd
 evenPlusOdd (NextEven n) = NextOdd . evenPlusOdd n
 
+
 -- | Proves odd + even = odd
 oddPlusEven :: Odd n -> Even m -> Odd (Add n m)
+
+-- GAD: In an ideal world, one just write
+
+-- oddPlusEven n m = evenPlusOdd m n
+
+-- plus some rewriting on the type level, and then let the compiler
+-- figure out that the types commute. But, proving indeed that Add or
+-- Mult commute at the type level is hard (see the following
+-- katas). Thus, we cannot escape doing some weight lifting.
+
 oddPlusEven OneOdd      = onePlusEven
 oddPlusEven (NextOdd n) = NextOdd . oddPlusEven n
 
 -- | Multiplies two natural numbers.
 type family   Mult (n :: Nat) (m :: Nat) :: Nat
 type instance Mult Z m = Z
+type instance Mult (S n) m = Add m (Mult n m)
 
--- I'd wish to be able to write here
+-- | Proves even * even = even
+
+-- I would (twice) need this lemma for adding evens twice
+addTwiceLEven :: Even m -> Even n -> Even (Add m (Add m n))
+addTwiceLEven m n = evenPlusEven m $ evenPlusEven m n
+
+evenTimesEven :: Even n -> Even m -> Even (Mult n m)
+evenTimesEven ZeroEven     m = ZeroEven
+evenTimesEven (NextEven n) m = addTwiceLEven m $ evenTimesEven n m
+
+-- GAD: For the next one, I'd wish to be able to write here
 
 -- type instance Mult (S Z) m = m
 
--- as well, but type instances do not allow casing/if.
+-- as well, and be done with it... but type instances do not allow
+-- casing/if. So, we will need a timesSn lemma.
 
-type instance Mult (S n) m = Add m (Mult n m)
+oneTimesOdd :: Odd n -> Odd (Mult (S Z) n)
+oneTimesOdd OneOdd      = OneOdd
+oneTimesOdd (NextOdd n) = NextOdd $ oneTimesOdd n
 
-forcing :: Even (Add n m) -> Even (Add (S (S n)) m)
-forcing m = NextEven m 
-
--- | Proves even * even = even
-evenTimesEven :: Even n -> Even m -> Even (Mult n m)
-evenTimesEven ZeroEven     m = ZeroEven
-evenTimesEven (NextEven n) m = addTwiceEven m $ evenTimesEven n m
- where addTwiceEven m n = evenPlusEven m $ evenPlusEven m n
-
+oneTimesEven :: Even n -> Even (Mult (S Z) n)
+oneTimesEven ZeroEven     = ZeroEven
+oneTimesEven (NextEven n) = evenPlusEven two $ oneTimesEven n
+   where two = NextEven ZeroEven
+         
 -- | Proves odd * odd = odd
 oddTimesOdd :: Odd n -> Odd m -> Odd (Mult n m)
-oddTimesOdd = error "TODO: oddTimesOdd"
+oddTimesOdd OneOdd      m = oneTimesOdd m
+oddTimesOdd (NextOdd n) m = oddPlusEven m $ oddPlusOdd m $ oddTimesOdd n m
+
+-- GAD: The proof takes the induction hypothesis (oddTimesOdd n m),
+-- then applies oddPlusOdd m to it, and finally applies
+-- oddPlusEven. In Coq/ssreflect we would (approximately) write:
+
+-- exact (oddPlusOdd m (oddPlusEven m IH))
+
+-- or even, move:IH; apply/(OddPlusEven m IH)/(odPlusOdd m).
 
 -- | Proves even * odd = even
 evenTimesOdd :: Even n -> Odd m -> Even (Mult n m)
-evenTimesOdd = error "TODO: evenTimesOdd"
+evenTimesOdd ZeroEven     m = ZeroEven
+evenTimesOdd (NextEven n) m = oddPlusOdd m $ oddPlusEven m $ evenTimesOdd n m
 
 -- | Proves odd * even = even
 oddTimesEven :: Odd n -> Even m -> Even (Mult n m)
-oddTimesEven = error "TODO: oddTimesEven"
+oddTimesEven OneOdd      m = oneTimesEven m
+oddTimesEven (NextOdd n) m = addTwiceLEven m $ oddTimesEven n m
 
+-- Alternatively, we could case on the second, Even, argument, but
+-- that would require other massaging lemmas to cope with the fact
+-- that the type family instances are defined recursively on the first
+-- argument.
+
+
+{- Auxiliary definitions from the kata's test file:
 
 -- Representations to Integers
 fromEven :: Even n -> Int
@@ -193,3 +231,5 @@ seven = NextOdd five
 eight = NextEven six
 nine = NextOdd seven
 ten = NextEven eight
+
+-}
