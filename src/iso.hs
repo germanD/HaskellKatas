@@ -99,17 +99,27 @@ isoUnMaybe :: ISO (Maybe a) (Maybe b) -> ISO a b
 -- Remember, for all valid ISO, converting and converting back
 -- Is the same as the original value.
 -- You need this to prove some case are impossible.
-isoUnMaybe f = (fromMBB, fromMBA)
-  where fromMBB a = case (substL f (Just a)) of
-                      Just b -> b
-                      Nothing -> substL (isoUnMaybe f) a
-        fromMBA b = case (substR f (Just b)) of
-                      Just a -> a
-                      Nothing -> substR (isoUnMaybe f) b
 
--- isoUnMaybe f =
---   (fromJust . substL f . Just , fromJust . substR f . Just)
---   where fromJust (Just x) = x
+
+-- WIP: I need to make the Nothing cases get something, so i need to
+-- make a new iso which gives me something back.
+
+--- The following definition typechecks, but it us not accepted by
+--- codewars, compilation times out.
+
+
+-- isoUnMaybe f = (fromMBB, fromMBA)
+--   where fromMBB a = case (substL f (Just a)) of
+--                       Just b -> b
+--                       Nothing -> substL (isoUnMaybe f) a
+--         fromMBA b = case (substR f (Just b)) of
+--                       Just a -> a
+--                       Nothing -> substR (isoUnMaybe f) b
+
+isoUnMaybe f =
+  (fromJust . substL f . Just , fromJust . substR f . Just)
+  where fromJust (Just x) = x
+        fromJust Nothing = fromJust Nothing
 
 -- We cannot have
 -- isoUnEither :: ISO (Either a b) (Either c d) -> ISO a c -> ISO b d.
